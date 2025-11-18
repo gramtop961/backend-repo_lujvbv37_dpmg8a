@@ -1,6 +1,9 @@
 import os
+import time
+from typing import List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -19,6 +22,36 @@ def read_root():
 @app.get("/api/hello")
 def hello():
     return {"message": "Hello from the backend API!"}
+
+# Simple cache for news (5 min TTL)
+_news_cache = {"items": [], "ts": 0}
+
+class NewsItem(BaseModel):
+    id: int
+    title: str
+    severity: str
+    time: str
+    summary: str
+
+class NewsResponse(BaseModel):
+    items: List[NewsItem]
+
+@app.get("/api/cyber/news", response_model=NewsResponse)
+def cyber_news():
+    now = int(time.time())
+    if _news_cache["items"] and now - _news_cache["ts"] < 300:
+        return {"items": _news_cache["items"]}
+
+    # In a real app, fetch from CMS or database. Here, serve deterministic mock items for SEO + demo.
+    items = [
+        {"id": 1, "title": "New CVE-2025-10421 detected affecting popular HTTP library", "severity": "high", "time": "2m ago", "summary": "Remote code execution possible under specific header parsing conditions."},
+        {"id": 2, "title": "Patch available for X package (2.4.1) – upgrade recommended", "severity": "medium", "time": "12m ago", "summary": "Fixes input validation bypass leading to privilege escalation."},
+        {"id": 3, "title": "Supply-chain alert: package yanked from registry after compromise", "severity": "critical", "time": "28m ago", "summary": "Malicious versions detected. Pin hashes and audit lockfiles."},
+    ]
+
+    _news_cache["items"] = items
+    _news_cache["ts"] = now
+    return {"items": items}
 
 @app.get("/test")
 def test_database():
